@@ -3,6 +3,8 @@ from django.contrib.auth import get_user_model
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from drf_yasg.utils import swagger_auto_schema
+# from rest_framework.schemas import openapi
+from drf_yasg import openapi
 from rest_framework.viewsets import GenericViewSet
 from rest_framework import status
 
@@ -92,7 +94,13 @@ class AccountView(GenericViewSet):
         except ValueError as e:
             return Response(status=status.HTTP_400_BAD_REQUEST)
 
-    @swagger_auto_schema(request_body=BankAccountSerializer)
+    @swagger_auto_schema(request_body=openapi.Schema(
+        type=openapi.TYPE_OBJECT,
+        required=['account', 'recipient', 'amount'],
+        properties={
+            'account': openapi.Schema(type=openapi.TYPE_STRING),
+            'recipient': openapi.Schema(type=openapi.TYPE_STRING),
+            'amount': openapi.Schema(type=openapi.TYPE_STRING)}))
     @action(detail=False, methods=['post'])
     def withdrawal_money(self, request):
         account = BankAccount.objects.filter(account_number=request.data['account_number'])
@@ -112,3 +120,41 @@ class AccountView(GenericViewSet):
         if account is None:
             return Response(status=status.HTTP_200_OK, data='Что-то пошло не так!')
         return Response(status=status.HTTP_200_OK, data=serializer_class.data)
+
+    @swagger_auto_schema(request_body=openapi.Schema(
+        type=openapi.TYPE_OBJECT,
+        required=['account', 'recipient', 'amount'],
+        properties={
+            'account': openapi.Schema(type=openapi.TYPE_STRING),
+            'recipient': openapi.Schema(type=openapi.TYPE_STRING),
+            'amount': openapi.Schema(type=openapi.TYPE_STRING)}))
+    @action(detail=False, methods=['post'])
+    def transaction(self, request):
+        account = BankAccount.objects.filter(account_number=request.data['account'])
+        recipient = BankAccount.objects.filter(account_number=request.data['recipient'])
+
+        if len(account) == 1 and len(recipient) == 1:
+            for obj in account:
+                if obj.status != '1':
+                    return Response(status=status.HTTP_200_OK, data='счет не активен!')
+                amount = int(obj.amount)
+                if int(request.data['amount']) > amount:
+                    return Response(status=status.HTTP_200_OK, data='Недостаточно средств!')
+                amount -= int(request.data['amount'])
+                obj.amount = amount
+                obj.save()
+
+            for obj in recipient:
+                if obj.status != '1':
+                    return Response(status=status.HTTP_200_OK, data='счет получателя не активен!')
+                amount = int(obj.amount)
+                amount += int(request.data['amount'])
+                obj.amount = amount
+                obj.save()
+
+            serializer_class = BankAccountSerializer(recipient, context={
+                'request': request,
+            }, many=True)
+            return Response(status=status.HTTP_200_OK, data=serializer_class.data)
+
+        return Response(status=status.HTTP_200_OK, data='счет не найден!')
