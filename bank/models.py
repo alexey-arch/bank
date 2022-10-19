@@ -6,7 +6,7 @@ from .managers import CustomUserManager
 
 class CustomUser(AbstractBaseUser):
     phone_number = models.CharField(max_length=10, unique=True, null=False)
-    iin = models.CharField(max_length=12, null=False)
+    iin = models.CharField(max_length=12, null=False, unique=True)
     password = models.CharField(max_length=250, null=False)
     first_name = models.CharField(max_length=250)
     last_name = models.CharField(max_length=250)
@@ -32,10 +32,10 @@ class CustomUser(AbstractBaseUser):
 
 class BankAccount(models.Model):
     client = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
-    account_number = models.CharField(max_length=20)
+    account_number = models.CharField(max_length=20, unique=True)
     amount = models.CharField(max_length=500)
     currency = models.CharField(max_length=20)
-    card_number = models.CharField(max_length=16)
+    card_number = models.CharField(max_length=16, unique=True)
     status = models.CharField(max_length=1)
 
     def __str__(self):
