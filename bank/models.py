@@ -41,3 +41,12 @@ class BankAccount(models.Model):
     def __str__(self):
         return self.account_number
 
+
+class History(models.Model):
+    client = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    amount = models.CharField(max_length=500)
+    bank_account = models.ForeignKey(BankAccount, on_delete=models.CASCADE)
+    data_time = models.DateTimeField()
+
+    def __str__(self):
+        return str(self.client)

@@ -1,16 +1,16 @@
-
 from django.contrib.auth import get_user_model
+from django.utils.datetime_safe import datetime
 from rest_framework.decorators import action
 from rest_framework.mixins import RetrieveModelMixin, CreateModelMixin
 from rest_framework.response import Response
 from drf_yasg.utils import swagger_auto_schema
 # from rest_framework.schemas import openapi
 from drf_yasg import openapi
-from rest_framework.viewsets import GenericViewSet
+from rest_framework.viewsets import GenericViewSet, ViewSet
 from rest_framework import status
 
-from .models import BankAccount
-from .serializers import UserSerializer, BankAccountSerializer
+from .models import BankAccount, History
+from .serializers import UserSerializer, BankAccountSerializer, HistorySerializer
 from .utils import randomDigits
 
 User = get_user_model()
@@ -21,7 +21,7 @@ class UserViewSet(GenericViewSet, CreateModelMixin, RetrieveModelMixin):
     serializer_class = UserSerializer
 
 
-class AccountView(GenericViewSet):
+class AccountView(ViewSet):
     @swagger_auto_schema()
     @action(detail=False, methods=['post'])
     def create_account(self, request):
@@ -33,7 +33,6 @@ class AccountView(GenericViewSet):
                               card_number=f"4400{randomDigits(12)}",
                               status='1')
         account.save()
-        print(account)
         serializer_class = BankAccountSerializer(account, context={
             'request': request,
         })
@@ -146,8 +145,32 @@ class AccountView(GenericViewSet):
         recipient.amount = amount
         recipient.save()
 
+        data = {"client": recipient.client,
+                "amount": request.data['amount'],
+                "bank_account": account,
+                "data_time": datetime.now()}
+
+        History.objects.create(**data)
+
         serializer_class = BankAccountSerializer(recipient, context={
             'request': request,
         })
         print(recipient)
+        return Response(status=status.HTTP_200_OK, data=serializer_class.data)
+
+
+class HistoryView(ViewSet):
+
+    @swagger_auto_schema(request_body=openapi.Schema(
+        type=openapi.TYPE_OBJECT,
+        required=['account'],
+        properties={'account': openapi.Schema(type=openapi.TYPE_STRING)}))
+    @action(detail=False, methods=['post'])
+    def get_history(self, request):
+        account = BankAccount.objects.get(account_number=request.data['account'])
+        queryset = History.objects.filter(bank_account=account)
+
+        serializer_class = HistorySerializer(queryset, context={
+            'request': request,
+        }, many=True)
         return Response(status=status.HTTP_200_OK, data=serializer_class.data)
